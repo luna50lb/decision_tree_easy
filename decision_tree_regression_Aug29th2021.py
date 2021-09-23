@@ -34,6 +34,43 @@ CB91_Violet = '#661D98'
 CB91_Amber = '#F5B14C'
 
 
+class DecisionTreeApproach():
+    def __init__(self, df_train, df_validation, predictors_list, target_var):
+        print('class DecisionTreeApproach is used ')
+        print('initialization')
+        dict_initialization={'df_train':df_train, 'df_validation':df_validation, 'predictors_list':predictors_list,
+        'target_var':target_var, 'max_depth':11}
+        for jv in list(dict_initialization):
+            if hasattr(self, jv)==False:
+                setattr(self, jv, dict_initialization.get(jv, 'Error!') )
+        print('max depth=', self.max_depth)
+        self.regressor_();
+        self.tree_viz();
+        
+    def regressor_(self):
+        print('predictors list=', self.predictors_list)
+        print('target variables=', self.target_var)
+        self.regressor0 = DecisionTreeRegressor(random_state=50, max_depth=self.max_depth) #Fit the regressor object to the dataset.
+        self.clf0=self.regressor0.fit( self.df_train[ self.predictors_list ].to_numpy(), self.df_train[ self.target_var ].to_numpy().reshape(-1,1))
+        self.df_validation['forecast1']=self.regressor0.predict(self.df_validation[ self.predictors_list ].to_numpy() )
+    
+    #
+    #from sklearn.tree import export_graphviz
+    #tree_data0=export_graphviz(regressor0, out_file=None, feature_names=predictors_list, class_names=[target_var], rounded=True, filled=True)
+    #gv0=graphviz.Source(tree_data0);
+    def tree_viz(self):
+        from sklearn.tree import export_graphviz
+        tree_data0=export_graphviz(self.regressor0, out_file=None, feature_names=self.predictors_list, class_names=[self.target_var], rounded=True, filled=True)
+        gv0=graphviz.Source(tree_data0);
+        gv0.format='png'
+        gv0.render(datetime.datetime.now().strftime('%Y%m%d_') + "chart_.gv", view=True)
+        list_impurities=self.regressor0.tree_.impurity
+        print('impurities=\n', list_impurities);
+        print('value=\n', self.regressor0.tree_.value);
+        print('children_left=\n', self.regressor0.tree_.children_left);
+        print('node_count=\n', self.regressor0.tree_.node_count)
+        print('feature=\n', self.regressor0.tree_.feature);
+
 if __name__=='__main__':
     df_data=pd.DataFrame(pd.date_range(start='2020-05-25', end='2020-09-30', freq='D'), columns=['date0']);
     df_data['month0']=df_data['date0'].dt.month;
@@ -48,10 +85,17 @@ if __name__=='__main__':
     df_train=df_data.iloc[:105,:]
     df_validation=df_data.iloc[105:,:]
     print('train=\n', df_train[['date0', 'month0', 'day0', 'noise0']].to_numpy())
-    regressor0 = DecisionTreeRegressor(random_state=0, max_depth=3) #Fit the regressor object to the dataset. 
-    clf0=regressor0.fit(df_train[['month0', 'day0']].to_numpy(), df_train['v1'].to_numpy().reshape(-1,1))
+    predictors_list0=['month0', 'day0']
+    target_var0='v1'
+    #
+    #regressor0 = DecisionTreeRegressor(random_state=50, max_depth=max_depth0) #Fit the regressor object to the dataset.
+    #clf0=regressor0.fit(df_train[ predictors_list ].to_numpy(), df_train[ target_var ].to_numpy().reshape(-1,1))
+    df_validation=df_validation.reset_index(drop=True);
+    dta0=DecisionTreeApproach(df_train=df_train, df_validation=df_validation, predictors_list=predictors_list0, target_var=target_var0);
+    
+    """
     from sklearn.tree import export_graphviz
-    tree_data0=export_graphviz(regressor0, out_file=None, feature_names=['month0', 'day0'], class_names=['v1'], rounded=True, filled=True)
+    tree_data0=export_graphviz(regressor0, out_file=None, feature_names=predictors_list, class_names=[target_var], rounded=True, filled=True)
     gv0=graphviz.Source(tree_data0);
     gv0.format='png'
     gv0.render(datetime.datetime.now().strftime('%Y%m%d_') + "chart_.gv", view=True)
@@ -61,10 +105,11 @@ if __name__=='__main__':
     print('children_left=\n', regressor0.tree_.children_left);
     print('node_count=\n', regressor0.tree_.node_count)
     print('feature=\n', regressor0.tree_.feature);
+    """
     #
     print('.....')
-    df_validation=df_validation.reset_index(drop=True);
-    df_validation['forecast1']=regressor0.predict(df_validation[['month0', 'day0']].to_numpy() )
+    
+    #df_validation['forecast1']=regressor0.predict(df_validation[ predictors_list ].to_numpy() )
     #df_validation['forecast1']=np.nan;
     #df_validation.at[:, 'forecast1']
     #dfpr=pd.DataFrame({'forecast1':regressor0.predict(df_validation[['month0', 'day0']] ) })
@@ -73,17 +118,19 @@ if __name__=='__main__':
     #df_validation['forecast1']=dfpr['forecast1']
     #print('type=', type(forecast1))
     print(df_validation)
-
-    imp_a0=permutation_importance(clf0, df_train[['month0', 'day0']].to_numpy(), df_train['v1'].to_numpy().reshape(-1,1) )
-    R2v=r2_score(y_true=df_validation['v1'].to_numpy().reshape(-1,1), y_pred=df_validation['forecast1'].to_numpy().reshape(-1,1) )
+    #
+    imp_a0=permutation_importance(dta0.clf0, df_train[ predictors_list0 ].to_numpy(), df_train[target_var0].to_numpy().reshape(-1,1) )
+    #
+    R2v=r2_score(y_true=dta0.df_validation[target_var0].to_numpy().reshape(-1,1), y_pred=dta0.df_validation['forecast1'].to_numpy().reshape(-1,1) )
     print('importance=\n', imp_a0)
     print('coeff of determination=\n', R2v);
+    #sns.set_pallete('rainbow', n_colors=5)
     fig0=plt.figure(figsize=(15,7));
     gspc0=fig0.add_gridspec(1,1)
     ax0=fig0.add_subplot(gspc0[0,0])
     #ax0.plot(df_train['date0'], df_train['v1'], lw=2, label='training')
-    ax0.plot(df_validation['date0'], df_validation['forecast1'], lw=2, label='forecast')
-    ax0.plot(df_data['date0'], df_data['v1'], ls='--', lw=2, label='actual')
+    ax0.plot(dta0.df_validation['date0'], dta0.df_validation['forecast1'], lw=2, label='forecast', color=CB91_Pink)
+    ax0.plot(df_data['date0'], df_data[target_var0], ls='--', lw=2, label='actual', color=CB91_Amber)
     ax0.tick_params(axis='both', which='major', labelsize=15)
     ax0.grid();
     ax0.legend()
