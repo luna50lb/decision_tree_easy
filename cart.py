@@ -116,6 +116,9 @@ class DecisionTreeRegressor():
             del(df_node_agg)
         return df_summary;
 
+    # 枝刈りについてはエンハンスが必要
+    def prune(self):
+        return -1;
     # infer method under construction 
     def infer(self):
         return -1; 

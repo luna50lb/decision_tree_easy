@@ -8,6 +8,16 @@ import numpy as np
 
 
 if __name__=='__main__':
+    from sklearn.datasets import fetch_california_housing
+    housing = fetch_california_housing()
+    df_a=pd.DataFrame(data=housing['data'], columns=housing['feature_names'])
+    df_a['target']=housing['target']
+    # df_a
+    list_feature_cols=housing['feature_names']
+    target_col='target'
+    df_w=df_a.copy()
+    
+    ''' 
     df_w=pd.DataFrame([])
     df_w=pd.read_csv('weather_data_HanedaJan23rd2022.csv', header=0, encoding='cp932')
     df_w.columns=np.arange(0, df_w.shape[1], 1)
@@ -19,10 +29,13 @@ if __name__=='__main__':
 
     list_feature_cols=['hour', 'wind']
     target_col='temperature'
+    ''' 
+    
+    print('features=', list_feature_cols)
     for jcol in list_feature_cols + [target_col]:
         df_w[jcol]=df_w[jcol].fillna(value=0).astype(np.float64)
     #df_w[:5]
-    dtr0=DecisionTreeRegressor();
+    dtr0=DecisionTreeRegressor(node_level_max=5);
     df_summary=dtr0.optimize(df_input=df_w.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
     print('summary=\n', df_summary )
     #
