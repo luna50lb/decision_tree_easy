@@ -12,7 +12,43 @@ class DecisionTreeRegressor():
             print('DecisionTreeRegressor class used')
         self.n_quantiles=n_quantiles
         self.node_level_max=node_level_max
-
+    
+    # やっと推論部分の実装に着手
+    def infer(self, df_infer, list_feature_cols, target_col):
+        node_level_max=self.node_level_max
+        df_instruct=self.df_summary[['node_id', 'node_level', 'feature', 'threshold', 'parent_node_id']].copy()
+        df_records_agg=pd.DataFrame([])
+        for node_id in df_instruct['node_id'].values.tolist():
+            df_compass=df_instruct[df_instruct['node_id']==node_id].reset_index(drop=True)
+            print('node_level=', df_compass.at[0, 'node_level'], ' node=', node_id)
+            threshold_value=df_compass.at[0, 'threshold']
+            feature_col=df_compass.at[0, 'feature']
+            parent_node_id=df_compass.at[0, 'parent_node_id']
+            if node_id in ['root']:
+                df_left=df_infer[df_infer[feature_col]<threshold_value].reset_index(drop=True)
+                df_right=df_infer[df_infer[feature_col]>=threshold_value].reset_index(drop=True)
+            else:
+                df_temp=df_records_agg[df_records_agg['node_id']==parent_node_id].reset_index(drop=True)
+                df_node=pd.DataFrame([])
+                if node_id.endswith('l'):
+                    df_node=df_temp.at[0,'df_left']
+                elif node_id.endswith('r'):
+                    df_node=df_temp.at[0,'df_right']
+                else:
+                    print('Error!, node_id=', node_id)
+                    raise ValueError;
+                del(df_temp)
+                df_left=df_node[df_node[feature_col]<threshold_value].reset_index(drop=True)
+                df_right=df_node[df_node[feature_col]>=threshold_value].reset_index(drop=True)
+                del(df_node)
+            del(df_compass)
+            df_j=pd.DataFrame({'node_id':[node_id], 'df_left':[df_left], 'df_right':[df_right], 'parent_node_id':[parent_node_id], 
+                               'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ] } )
+            df_records_agg=pd.concat([df_records_agg, df_j],axis=0).reset_index(drop=True)
+            del(df_j)
+        df_records_agg=df_records_agg.reset_index(drop=True)
+        return df_records_agg;
+    
     def search_thresholds(self, df_p, list_feature_cols, n_quantiles=6):
         df_grid=pd.DataFrame([])
         df_quantile=df_p[list_feature_cols].quantile(q=np.linspace(0, 1, n_quantiles).tolist()[1:-1] ).reset_index().reset_index(drop=True).rename(columns={'index':'quantile'})
@@ -39,14 +75,16 @@ class DecisionTreeRegressor():
             df_left=df_p[df_p[jfeat]<feat_threshold].reset_index(drop=True)
             cost_l=df_left[target_col].std(ddof=0)
             n_sample_l=df_left.shape[0]
+            #target_value_left=df_left[target_col].mean()
             #
             df_right=df_p[df_p[jfeat]>=feat_threshold].reset_index(drop=True)
             cost_r=df_right[target_col].std(ddof=0)
             n_sample_r=df_right.shape[0]
+            #target_value_right=df_right[target_col].mean()
             #
             information_gain=cost_p - (n_sample_l * cost_l / n_sample_p) - (n_sample_r * cost_r / n_sample_p)
             # print('feat={}, {:.2f}, {:.3f}, {:.3f}, {:.3f}, {:.4f}'.format( jfeat, feat_threshold, cost_p, cost_l, cost_r, information_gain) )
-            df_j=pd.DataFrame({'feature':[jfeat], 'threshold':[feat_threshold], 'information_gain':[information_gain], 'df_left':[df_left], 'df_right':[df_right]})
+            df_j=pd.DataFrame({'feature':[jfeat], 'threshold':[feat_threshold], 'information_gain':[information_gain], 'df_left':[df_left], 'df_right':[df_right] } )
             df_agg=pd.concat([df_agg, df_j],axis=0)
             del(df_left)
             del(df_right)
@@ -70,7 +108,7 @@ class DecisionTreeRegressor():
                     raise ValueError;
                 df_node_agg=pd.DataFrame({'node_id':[ 'root' ], 'node_level':[node_level], 'feature':[jfeat], 'threshold':[feat_threshold], 
                                       'information_gain':[information_gain], 'n_left':[df_left.shape[0]], 'n_right':[df_right.shape[0] ], 
-                                          'df_left':[df_left], 'df_right':[df_right], 'parent_node_id':["n/a"] } )
+                                          'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 'df_left':[df_left], 'df_right':[df_right], 'parent_node_id':["n/a"] } )
                 del(jfeat)
                 del(feat_threshold)
                 del(information_gain)
@@ -90,7 +128,8 @@ class DecisionTreeRegressor():
                         raise ValueError;
                     df_jl=pd.DataFrame({'node_id':[ str(node_level) + '_' + str(jdx) + 'l' ], 'node_level':[node_level], 'feature':[jfeat], 'threshold':[feat_threshold], 
                                       'information_gain':[information_gain], 'n_left':[df_left.shape[0]], 'n_right':[df_right.shape[0] ], 
-                                        'df_left':[df_left], 'df_right':[df_right], 'parent_node_id':[jrow.node_id]})
+                                        'df_left':[df_left], 'df_right':[df_right], 
+                                        'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 'parent_node_id':[jrow.node_id]})
                     df_node_agg=pd.concat([df_node_agg, df_jl],axis=0)
                     del(df_jl)
                     del(df_left_parent)
@@ -103,7 +142,8 @@ class DecisionTreeRegressor():
                         raise ValueError;
                     df_jr=pd.DataFrame({'node_id':[ str(node_level) + '_' + str(jdx) + 'r' ], 'node_level':[node_level], 'feature':[jfeat], 'threshold':[feat_threshold], 
                                       'information_gain':[information_gain], 'n_left':[df_left.shape[0]], 'n_right':[df_right.shape[0] ], 
-                                        'df_left':[df_left], 'df_right':[df_right], 'parent_node_id':[jrow.node_id]})
+                                        'df_left':[df_left], 'df_right':[df_right], 
+                                        'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 'parent_node_id':[jrow.node_id]})
                     df_node_agg=pd.concat([df_node_agg, df_jr],axis=0)
                     del(df_jr)
                     del(df_right_parent)
@@ -114,11 +154,9 @@ class DecisionTreeRegressor():
                 raise ValueError
             df_summary=pd.concat([df_summary, df_node_agg],axis=0).reset_index(drop=True)
             del(df_node_agg)
+        self.df_summary=df_summary.copy()
         return df_summary;
 
     # 枝刈りについてはエンハンスが必要
     def prune(self):
         return -1;
-    # infer method under construction 
-    def infer(self):
-        return -1; 
