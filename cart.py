@@ -12,7 +12,26 @@ class DecisionTreeRegressor():
             print('DecisionTreeRegressor class used')
         self.n_quantiles=n_quantiles
         self.node_level_max=node_level_max
-    
+    #
+    # 今の所 modeはvalidationのみ(エンハンス必要)
+    def __call__(self, df_train, df_val, list_feature_cols, target_col, mode='validation'):
+        df_res_train=self.optimize(df_input=df_train.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+        df_res_val=self.infer(df_infer=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+        df_res_val=df_res_val[df_res_val['isleafnode']==True].reset_index(drop=True)
+        df_leaf=pd.DataFrame([])
+        for jrow in df_res_val.itertuples():
+            jrow.df_left['mean']=jrow.mean_left
+            jrow.df_right['mean']=jrow.mean_right
+            df_j=pd.concat([jrow.df_left, jrow.df_right], axis=0)
+            df_j=df_j.reset_index(drop=True)
+            #print('jrow df_left=\n', jrow.df_left)
+            df_leaf=pd.concat([df_leaf,df_j] ,axis=0)
+            del(df_j)
+        del(df_res_val)
+        df_leaf=df_leaf.reset_index(drop=True)
+        df_res_val=df_leaf.copy()
+        return [df_res_train, df_res_val];
+    #
     # やっと推論部分の実装に着手
     def infer(self, df_infer, list_feature_cols, target_col):
         node_level_max=self.node_level_max
@@ -43,10 +62,16 @@ class DecisionTreeRegressor():
                 del(df_node)
             del(df_compass)
             df_j=pd.DataFrame({'node_id':[node_id], 'df_left':[df_left], 'df_right':[df_right], 'parent_node_id':[parent_node_id], 
-                               'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ] } )
+                               'mean_left':[df_left[target_col].mean() ], 'mean_right':[df_right[target_col].mean() ], } )
             df_records_agg=pd.concat([df_records_agg, df_j],axis=0).reset_index(drop=True)
             del(df_j)
         df_records_agg=df_records_agg.reset_index(drop=True)
+        
+        # leaf node(葉ノード)の決定
+        df_parent_nodes=pd.DataFrame({'node_id':df_records_agg['parent_node_id'].unique().tolist() })
+        df_parent_nodes['isleafnode']=False;
+        df_records_agg=df_records_agg.merge(df_parent_nodes, on=['node_id'], how='left', validate='1:1', suffixes=('', '_parent'))
+        df_records_agg['isleafnode']=df_records_agg['isleafnode'].apply(lambda bool0: True if pd.isnull(bool0) else bool0)
         return df_records_agg;
     
     def search_thresholds(self, df_p, list_feature_cols, n_quantiles=6):
