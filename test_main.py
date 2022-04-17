@@ -35,8 +35,15 @@ if __name__=='__main__':
     for jcol in list_feature_cols + [target_col]:
         df_w[jcol]=df_w[jcol].fillna(value=0).astype(np.float64)
     #df_w[:5]
-    dtr0=DecisionTreeRegressor(node_level_max=5);
-    df_summary=dtr0.optimize(df_input=df_w.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
-    print('summary=\n', df_summary )
+    itrain0=np.int64(df_a.shape[0]*0.7)
+    print('int=', itrain0)
+    df_train=df_w[:itrain0]
+    df_val=df_w[itrain0:]
+    dtr_inst=DecisionTreeRegressor(node_level_max=4);
+    [df_res_train, df_res_val]=dtr_inst(df_train=df_train.copy(), df_val=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+    
+    print('res train=\n', df_res_train)
+    print('res val=\n', df_res_val[:17])
+    print('res val=\n', df_res_val[33:60])
     #
     print('normal exit at ', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
