@@ -11,6 +11,6 @@
 ### 使い方
 ```
 dtr_inst=DecisionTreeRegressor(node_level_max=4);
-[df_res_train, df_res_val]=dtr_inst(df_train=df_train.copy(), df_val=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+df_res_train, df_res_val=dtr_inst(df_train=df_train.copy(), df_val=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
     
 ```
