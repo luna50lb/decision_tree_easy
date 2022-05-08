@@ -6,16 +6,20 @@ import numpy as np
 
 
 
-class DecisionTreeRegressor():
+class Cart():
     def __init__(self, node_level_max=4, n_quantiles=6, verbose=1):
         if verbose==1:
-            print('DecisionTreeRegressor class used')
+            print('class Cart is used')
         self.n_quantiles=n_quantiles
         self.node_level_max=node_level_max
     #
     # 今の所 modeはvalidationのみ(エンハンス必要)
     def __call__(self, df_train, df_val, list_feature_cols, target_col, mode='validation'):
-        df_res_train=self.optimize(df_input=df_train.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+        vt0=self.optimize(df_input=df_train.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+        df_res_train, df_0=self.infer(df_infer=df_train.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+        df_res_val, df_1=self.infer(df_infer=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+        
+        ''' 
         df_res_val=self.infer(df_infer=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
         df_res_val=df_res_val[df_res_val['isleafnode']==True].reset_index(drop=True)
         df_leaf=pd.DataFrame([])
@@ -31,9 +35,16 @@ class DecisionTreeRegressor():
         df_leaf=df_leaf.reset_index(drop=True)
         df_res_val=df_leaf.copy()
         return [df_res_train, df_res_val];
+        '''
+        return df_res_train, df_res_val
     #
     # やっと推論部分の実装に着手
     def infer(self, df_infer, list_feature_cols, target_col):
+        if 'index' in df_infer.columns.tolist():
+            print('Error! df_infer should not contain column whose name is index.')
+            raise ValueError
+        df_infer=df_infer.reset_index(drop=True).reset_index(drop=False).rename(columns={'index':'record_id' } )
+        #
         node_level_max=self.node_level_max
         df_instruct=self.df_summary[['node_id', 'node_level', 'feature', 'threshold', 'parent_node_id']].copy()
         df_records_agg=pd.DataFrame([])
@@ -72,7 +83,22 @@ class DecisionTreeRegressor():
         df_parent_nodes['isleafnode']=False;
         df_records_agg=df_records_agg.merge(df_parent_nodes, on=['node_id'], how='left', validate='1:1', suffixes=('', '_parent'))
         df_records_agg['isleafnode']=df_records_agg['isleafnode'].apply(lambda bool0: True if pd.isnull(bool0) else bool0)
-        return df_records_agg;
+        df_records_agg=df_records_agg.reset_index(drop=True)
+        #
+        df_chosen=df_records_agg[df_records_agg['isleafnode']==True].reset_index(drop=True)
+        df_pred=pd.DataFrame([])
+        for jrow in df_chosen.itertuples():
+            df_left=jrow.df_left.copy()
+            df_left['y_pred']=jrow.mean_left
+            df_right=jrow.df_right.copy()
+            df_right['y_pred']=jrow.mean_right
+            df_pred=pd.concat([df_pred, df_left[['record_id', 'y_pred']], df_right[['record_id', 'y_pred']] ],axis=0)
+            del(df_left)
+            del(df_right)
+        df_pred=df_pred.reset_index(drop=True)
+        df_infer=df_infer.merge(df_pred, on=['record_id'], how='left', validate='1:1', suffixes=('', '_pred') )
+        #print('D0: infer=\n', df_infer)
+        return df_infer, df_records_agg;
     
     def search_thresholds(self, df_p, list_feature_cols, n_quantiles=6):
         df_grid=pd.DataFrame([])
@@ -185,3 +211,14 @@ class DecisionTreeRegressor():
     # 枝刈りについてはエンハンスが必要
     def prune(self):
         return -1;
+
+    
+
+# Cartのサブプラスとして定義
+class DecisionTreeRegressor(Cart):
+    def __init__(self, node_level_max=4, n_quantiles=6, verbose=1):
+        if verbose==1:
+            print('class DecisionTreeRegressor is used')
+        #self.n_quantiles=n_quantiles
+        #self.node_level_max=node_level_max
+        super().__init__(node_level_max=node_level_max, n_quantiles=n_quantiles, verbose=verbose)
