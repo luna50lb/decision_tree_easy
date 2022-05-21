@@ -9,22 +9,18 @@ import numpy as np
 import sys
 
 
+
 ''' 
 df_w=pd.DataFrame([])
 df_w=pd.read_csv('weather_data_HanedaJan23rd2022.csv', header=0, encoding='cp932')
 df_w.columns=np.arange(0, df_w.shape[1], 1)
 df_w=df_w[[0,1,2,3,4,5,6]]
 df_w=df_w[5:].reset_index(drop=True)
-df_w=df_w.rename(columns={0:'datetime', 1:'temperature', 2:'high', 3:'low', 4:'wind', 5:'quolity', 6:'direction'})
-df_w['datetime']=pd.to_datetime(df_w['datetime'], format='%Y/%m/%d %H:%M')
-df_w['hour']=df_w['datetime'].dt.hour
 
-list_feature_cols=['hour', 'wind']
-target_col='temperature'
 ''' 
 
+
 if __name__=='__main__':
-    
     df=pd.DataFrame({'x0':np.arange(-5,10,0.2)} )
     df['y']=1.5 / (1.2 + np.cos( df['x0'] ) ) + np.random.randint(low=-50,high=50, size=(df.shape[0], ) ) * 0.01
     print('df=\n',df)
@@ -35,7 +31,7 @@ if __name__=='__main__':
     df_val=df[train_val_split_idx:]
     list_feature_cols=['x0']
     target_col='y'
-    dtr_inst=DecisionTreeRegressor(node_level_max=4);
+    dtr_inst=DecisionTreeRegressor(node_level_max=5, n_quantiles=6, verbose=0);
     df_res_train, df_res_val=dtr_inst(df_train=df_train.copy(), df_val=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
     print('res train=\n',df_res_train )
     print('res train columns=\n', df_res_train.columns)
