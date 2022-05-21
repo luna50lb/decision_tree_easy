@@ -4,11 +4,17 @@ import numpy as np
 
 
 
+"""
+クラス名: Cart
+概要:
 
+information_gainがnullとなった場合には、それ以降の分枝は行われないという仕様。
+"""
 
 class Cart():
     def __init__(self, node_level_max=4, n_quantiles=6, verbose=1):
-        if verbose==1:
+        self.verbose=verbose
+        if self.verbose==1:
             print('class Cart is used')
         self.n_quantiles=n_quantiles
         self.node_level_max=node_level_max
@@ -50,7 +56,8 @@ class Cart():
         df_records_agg=pd.DataFrame([])
         for node_id in df_instruct['node_id'].values.tolist():
             df_compass=df_instruct[df_instruct['node_id']==node_id].reset_index(drop=True)
-            print('node_level=', df_compass.at[0, 'node_level'], ' node=', node_id)
+            if self.verbose==1:
+                print('node_level=', df_compass.at[0, 'node_level'], ' node=', node_id)
             threshold_value=df_compass.at[0, 'threshold']
             feature_col=df_compass.at[0, 'feature']
             parent_node_id=df_compass.at[0, 'parent_node_id']
@@ -166,7 +173,8 @@ class Cart():
                 del(df_left)
                 del(df_right)
             elif node_level>=1:
-                df_node_parent=df_summary[df_summary['node_level']==node_level-1].reset_index(drop=True)
+                #df_node_parent=df_summary[df_summary['node_level']==node_level-1].reset_index(drop=True)
+                df_node_parent=df_summary[(df_summary['node_level']==node_level-1) & (~df_summary['information_gain'].isnull() )].reset_index(drop=True)
                 df_node_agg=pd.DataFrame([])
                 for jdx, jrow in enumerate(df_node_parent.itertuples()):
                     # print('**')
@@ -214,11 +222,54 @@ class Cart():
 
     
 
-# Cartのサブプラスとして定義
+
+# Cartのサブクラスとして定義
 class DecisionTreeRegressor(Cart):
     def __init__(self, node_level_max=4, n_quantiles=6, verbose=1):
-        if verbose==1:
-            print('class DecisionTreeRegressor is used')
         #self.n_quantiles=n_quantiles
         #self.node_level_max=node_level_max
         super().__init__(node_level_max=node_level_max, n_quantiles=n_quantiles, verbose=verbose)
+        if self.verbose==1:
+            print('class DecisionTreeRegressor is used')
+      
+    # 今の所 modeはvalidationのみ(エンハンス必要)
+    def __call__(self, df_train, df_val, list_feature_cols, target_col, mode='validation'):
+        df_summary=self.optimize(df_input=df_train.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+        df_res_train, df_0=self.infer(df_infer=df_train.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+        df_res_val, df_1=self.infer(df_infer=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+        #
+        print('summary columns=\n', df_summary.columns)
+        print('summary df=\n', df_summary[['node_id', 'parent_node_id', 'node_level', 'information_gain', 'n_left', 'n_right'] ])
+        return df_res_train, df_res_val
+    
+    # Cartのエンハンスを行う。サンプルが0だった場合には
+    def get_nodes(self, df_p, df_grid, target_col):
+        df_agg=pd.DataFrame([])
+        for jlist in df_grid.values:
+            jfeat=jlist[0] # 'hour'
+            feat_threshold=jlist[1] # 8
+            #
+            cost_p=df_p[target_col].std(ddof=0) # parentノードのコスト
+            n_sample_p=df_p.shape[0]
+            #
+            df_left=df_p[df_p[jfeat]<feat_threshold].reset_index(drop=True)
+            cost_l=df_left[target_col].std(ddof=0)
+            n_sample_l=df_left.shape[0]
+            #target_value_left=df_left[target_col].mean()
+            #
+            df_right=df_p[df_p[jfeat]>=feat_threshold].reset_index(drop=True)
+            cost_r=df_right[target_col].std(ddof=0)
+            n_sample_r=df_right.shape[0]
+            #target_value_right=df_right[target_col].mean()
+            #
+            #print('n sample p, l, r=', n_sample_p, n_sample_l, n_sample_r, ' | cost p, l, r=', np.round(cost_p,2), np.round(cost_l,2), np.round(cost_r,2) )
+            information_gain=cost_p - (n_sample_l * cost_l / n_sample_p) - (n_sample_r * cost_r / n_sample_p)
+            # print('feat={}, {:.2f}, {:.3f}, {:.3f}, {:.3f}, {:.4f}'.format( jfeat, feat_threshold, cost_p, cost_l, cost_r, information_gain) )
+            df_j=pd.DataFrame({'feature':[jfeat], 'threshold':[feat_threshold], 'information_gain':[information_gain], 'df_left':[df_left], 'df_right':[df_right] } )
+            df_agg=pd.concat([df_agg, df_j],axis=0)
+            del(df_left)
+            del(df_right)
+        #
+        #print('df_agg=\n', df_agg[['feature', 'threshold', 'information_gain']])
+        df_agg=df_agg.sort_values(by=['information_gain'],ascending=[False]*1).reset_index(drop=True)
+        return df_agg.values.tolist()[0]
