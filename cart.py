@@ -199,7 +199,9 @@ class Cart():
                                       'information_gain':[information_gain], 'n_left':[df_left.shape[0]], 'n_right':[df_right.shape[0] ], 
                                         'df_left':[df_left], 'df_right':[df_right], 
                                         'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 
-                                        'parent_node_id':[jrow.node_id], 'parent_threshold':[jrow.threshold], 'parent_feature':[jrow.feature], 'a_region':[a_region_l] })
+                                        'parent_node_id':[jrow.node_id], 'parent_threshold':[jrow.threshold], 'parent_feature':[jrow.feature], 'a_region':[a_region_l], 
+                                        #'mean_left':[df_left[target_col].mean() ], 'mean_right':[df_right[target_col].mean() ], 
+                                       })
                     df_node_agg=pd.concat([df_node_agg, df_jl],axis=0)
                     del(df_jl)
                     del(df_left_parent)
@@ -215,7 +217,9 @@ class Cart():
                                       'information_gain':[information_gain], 'n_left':[df_left.shape[0]], 'n_right':[df_right.shape[0] ], 
                                         'df_left':[df_left], 'df_right':[df_right], 
                                         'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 
-                                        'parent_node_id':[jrow.node_id], 'parent_threshold':[jrow.threshold], 'parent_feature':[jrow.feature], 'a_region':[a_region_r] })
+                                        'parent_node_id':[jrow.node_id], 'parent_threshold':[jrow.threshold], 'parent_feature':[jrow.feature], 'a_region':[a_region_r],
+                                       # 'mean_left':[df_left[target_col].mean() ], 'mean_right':[df_right[target_col].mean() ], 
+                                       })
                     df_node_agg=pd.concat([df_node_agg, df_jr],axis=0)
                     del(df_jr)
                     del(df_right_parent)
@@ -254,7 +258,7 @@ class DecisionTreeRegressor(Cart):
         df_res_val, df_1=self.infer(df_infer=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
         #
         print('summary columns=\n', df_summary.columns)
-        print('summary df=\n', df_summary[['node_id', 'parent_node_id', 'threshold', 'parent_threshold', 'feature', 'parent_feature', 'node_level', 'information_gain', 'n_left', 'n_right', 'a_region'] ])
+        print('summary df=\n', df_summary[['node_id', 'parent_node_id', 'feature', 'node_level', 'information_gain', 'n_left', 'n_right', 'a_region', 'target_left', 'target_right'] ])
         return df_res_train, df_res_val
     
     # Cartのエンハンスを行う。サンプルが0だった場合にはinformation gainがNAN
