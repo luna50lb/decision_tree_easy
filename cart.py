@@ -6,7 +6,7 @@ import numpy as np
 
 """
 クラス名: Cart
-概要:
+概要: 決定木の構築
 
 information_gainがnullとなった場合には、それ以降の分枝は行われないという仕様。
 """
@@ -151,6 +151,10 @@ class Cart():
         return df_agg.values.tolist()[0]
 
     def optimize(self, df_input, list_feature_cols, target_col, ): 
+        a_region=np.zeros(shape=(len(list_feature_cols),2) )
+        a_region[:,0]=-np.inf
+        a_region[:,1]=np.inf
+        #
         node_level_max=self.node_level_max
         df_w0=df_input.copy()
         n_quantiles=self.n_quantiles
@@ -166,7 +170,8 @@ class Cart():
                     raise ValueError;
                 df_node_agg=pd.DataFrame({'node_id':[ 'root' ], 'node_level':[node_level], 'feature':[jfeat], 'threshold':[feat_threshold], 
                                       'information_gain':[information_gain], 'n_left':[df_left.shape[0]], 'n_right':[df_right.shape[0] ], 
-                                          'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 'df_left':[df_left], 'df_right':[df_right], 'parent_node_id':["n/a"] } )
+                                          'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 'df_left':[df_left], 'df_right':[df_right], 'parent_node_id':["n/a"],
+                                         'a_region':[a_region] } )
                 del(jfeat)
                 del(feat_threshold)
                 del(information_gain)
@@ -177,8 +182,13 @@ class Cart():
                 df_node_parent=df_summary[(df_summary['node_level']==node_level-1) & (~df_summary['information_gain'].isnull() )].reset_index(drop=True)
                 df_node_agg=pd.DataFrame([])
                 for jdx, jrow in enumerate(df_node_parent.itertuples()):
+                    a_region_l=jrow.a_region.copy()
+                    a_region_r=jrow.a_region.copy()
+                    a_region_l[ list_feature_cols.index(jrow.feature)  ,1]=np.min( [jrow.threshold, jrow.a_region[list_feature_cols.index(jrow.feature), 1]  ] )
+                    a_region_r[ list_feature_cols.index(jrow.feature)  ,0]=np.max( [jrow.threshold, jrow.a_region[list_feature_cols.index(jrow.feature), 0]  ] )
+                    #
                     # print('**')
-                    df_left_parent=jrow.df_left
+                    df_left_parent=jrow.df_left.copy()
                     # print('left parent type=', type(df_left_parent))
                     df_grid=self.search_thresholds(df_p=df_left_parent.copy(), list_feature_cols=list_feature_cols, n_quantiles=n_quantiles)
                     jfeat, feat_threshold, information_gain, df_left, df_right=self.get_nodes(df_p=df_left_parent.copy(), df_grid=df_grid.copy(), target_col=target_col )
@@ -188,12 +198,14 @@ class Cart():
                     df_jl=pd.DataFrame({'node_id':[ str(node_level) + '_' + str(jdx) + 'l' ], 'node_level':[node_level], 'feature':[jfeat], 'threshold':[feat_threshold], 
                                       'information_gain':[information_gain], 'n_left':[df_left.shape[0]], 'n_right':[df_right.shape[0] ], 
                                         'df_left':[df_left], 'df_right':[df_right], 
-                                        'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 'parent_node_id':[jrow.node_id]})
+                                        'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 
+                                        'parent_node_id':[jrow.node_id], 'parent_threshold':[jrow.threshold], 'parent_feature':[jrow.feature], 'a_region':[a_region_l] })
                     df_node_agg=pd.concat([df_node_agg, df_jl],axis=0)
                     del(df_jl)
                     del(df_left_parent)
+                    del a_region_l
                     # 
-                    df_right_parent=jrow.df_right
+                    df_right_parent=jrow.df_right.copy()
                     df_grid=self.search_thresholds(df_p=df_right_parent.copy(), list_feature_cols=list_feature_cols, n_quantiles=n_quantiles)
                     jfeat, feat_threshold, information_gain, df_left, df_right=self.get_nodes(df_p=df_right_parent.copy(), df_grid=df_grid.copy(), target_col=target_col )
                     if df_left.shape[0] + df_right.shape[0]!=df_right_parent.shape[0]:
@@ -202,10 +214,12 @@ class Cart():
                     df_jr=pd.DataFrame({'node_id':[ str(node_level) + '_' + str(jdx) + 'r' ], 'node_level':[node_level], 'feature':[jfeat], 'threshold':[feat_threshold], 
                                       'information_gain':[information_gain], 'n_left':[df_left.shape[0]], 'n_right':[df_right.shape[0] ], 
                                         'df_left':[df_left], 'df_right':[df_right], 
-                                        'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 'parent_node_id':[jrow.node_id]})
+                                        'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 
+                                        'parent_node_id':[jrow.node_id], 'parent_threshold':[jrow.threshold], 'parent_feature':[jrow.feature], 'a_region':[a_region_r] })
                     df_node_agg=pd.concat([df_node_agg, df_jr],axis=0)
                     del(df_jr)
                     del(df_right_parent)
+                    del a_region_r
                 del(df_node_parent)
                 df_node_agg=df_node_agg.reset_index(drop=True)
             else:
@@ -213,6 +227,7 @@ class Cart():
                 raise ValueError
             df_summary=pd.concat([df_summary, df_node_agg],axis=0).reset_index(drop=True)
             del(df_node_agg)
+        df_summary=df_summary.reset_index(drop=True)
         self.df_summary=df_summary.copy()
         return df_summary;
 
@@ -239,10 +254,10 @@ class DecisionTreeRegressor(Cart):
         df_res_val, df_1=self.infer(df_infer=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
         #
         print('summary columns=\n', df_summary.columns)
-        print('summary df=\n', df_summary[['node_id', 'parent_node_id', 'node_level', 'information_gain', 'n_left', 'n_right'] ])
+        print('summary df=\n', df_summary[['node_id', 'parent_node_id', 'threshold', 'parent_threshold', 'feature', 'parent_feature', 'node_level', 'information_gain', 'n_left', 'n_right', 'a_region'] ])
         return df_res_train, df_res_val
     
-    # Cartのエンハンスを行う。サンプルが0だった場合には
+    # Cartのエンハンスを行う。サンプルが0だった場合にはinformation gainがNAN
     def get_nodes(self, df_p, df_grid, target_col):
         df_agg=pd.DataFrame([])
         for jlist in df_grid.values:
