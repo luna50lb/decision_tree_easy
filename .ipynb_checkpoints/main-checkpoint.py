@@ -31,7 +31,7 @@ if __name__=='__main__':
     df_val=df[train_val_split_idx:]
     list_feature_cols=['x0']
     target_col='y'
-    dtr_inst=DecisionTreeRegressor(node_level_max=5, n_quantiles=6, verbose=0);
+    dtr_inst=DecisionTreeRegressor(node_level_max=4, n_quantiles=10, verbose=0);
     df_res_train, df_res_val=dtr_inst(df_train=df_train.copy(), df_val=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
     print('res train=\n',df_res_train )
     print('res train columns=\n', df_res_train.columns)
