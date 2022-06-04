@@ -89,6 +89,9 @@ class Cart():
         df_parent_nodes=pd.DataFrame({'node_id':df_records_agg['parent_node_id'].unique().tolist() })
         df_parent_nodes['isleafnode']=False;
         df_records_agg=df_records_agg.merge(df_parent_nodes, on=['node_id'], how='left', validate='1:1', suffixes=('', '_parent'))
+        #
+        df_records_agg=df_records_agg.merge(self.df_summary[['node_id', 'a_region']], on=['node_id'], how='left', validate='1:1', suffixes=('', '_summary') )
+        #
         df_records_agg['isleafnode']=df_records_agg['isleafnode'].apply(lambda bool0: True if pd.isnull(bool0) else bool0)
         df_records_agg=df_records_agg.reset_index(drop=True)
         #
@@ -171,7 +174,7 @@ class Cart():
                 df_node_agg=pd.DataFrame({'node_id':[ 'root' ], 'node_level':[node_level], 'feature':[jfeat], 'threshold':[feat_threshold], 
                                       'information_gain':[information_gain], 'n_left':[df_left.shape[0]], 'n_right':[df_right.shape[0] ], 
                                           'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 'df_left':[df_left], 'df_right':[df_right], 'parent_node_id':["n/a"],
-                                         'a_region':[a_region] } )
+                                         'a_region':[a_region], 'target_parent':[np.nan] } )
                 del(jfeat)
                 del(feat_threshold)
                 del(information_gain)
@@ -201,7 +204,7 @@ class Cart():
                                         'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 
                                         'parent_node_id':[jrow.node_id], 'parent_threshold':[jrow.threshold], 'parent_feature':[jrow.feature], 'a_region':[a_region_l], 
                                         #'mean_left':[df_left[target_col].mean() ], 'mean_right':[df_right[target_col].mean() ], 
-                                       })
+                                       'target_parent':[df_left_parent[target_col].mean() ] })
                     df_node_agg=pd.concat([df_node_agg, df_jl],axis=0)
                     del(df_jl)
                     del(df_left_parent)
@@ -219,7 +222,7 @@ class Cart():
                                         'target_left':[df_left[target_col].mean() ], 'target_right':[df_right[target_col].mean() ], 
                                         'parent_node_id':[jrow.node_id], 'parent_threshold':[jrow.threshold], 'parent_feature':[jrow.feature], 'a_region':[a_region_r],
                                        # 'mean_left':[df_left[target_col].mean() ], 'mean_right':[df_right[target_col].mean() ], 
-                                       })
+                                       'target_parent':[df_right_parent[target_col].mean() ] })
                     df_node_agg=pd.concat([df_node_agg, df_jr],axis=0)
                     del(df_jr)
                     del(df_right_parent)
@@ -254,11 +257,12 @@ class DecisionTreeRegressor(Cart):
     # 今の所 modeはvalidationのみ(エンハンス必要)
     def __call__(self, df_train, df_val, list_feature_cols, target_col, mode='validation'):
         df_summary=self.optimize(df_input=df_train.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
-        df_res_train, df_0=self.infer(df_infer=df_train.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
+        df_res_train, df_records_agg=self.infer(df_infer=df_train.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
         df_res_val, df_1=self.infer(df_infer=df_val.copy(), list_feature_cols=list_feature_cols, target_col=target_col)
         #
         print('summary columns=\n', df_summary.columns)
-        print('summary df=\n', df_summary[['node_id', 'parent_node_id', 'feature', 'node_level', 'information_gain', 'n_left', 'n_right', 'a_region', 'target_left', 'target_right'] ])
+        print('summary df=\n', df_summary[['node_id', 'parent_node_id', 'feature', 'node_level', 'information_gain', 'n_left', 'n_right', 'a_region', 'target_left', 'target_right', 'target_parent'] ])
+        print('agg=\n', df_records_agg[['node_id', 'mean_left', 'mean_right', 'isleafnode', 'a_region'] ] )
         return df_res_train, df_res_val
     
     # Cartのエンハンスを行う。サンプルが0だった場合にはinformation gainがNAN
