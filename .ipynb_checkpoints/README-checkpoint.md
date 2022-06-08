@@ -20,6 +20,8 @@ df_res_train, df_res_val=dtr_inst(df_train=df_train.copy(), df_val=df_val.copy()
 
 ### エンハンス 
 - 分岐図を作成するなどして、どのような分岐プロセスになっているかを視覚化できるように
+- multidimensional
+- regionsの表示
 - 枝かりの部分
 
 
